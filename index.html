@@ -8,78 +8,132 @@
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; }
         #map { width: 100%; height: 100%; }
-        
-        #nav-bar {
-            position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
-            background: #111827; color: white; padding: 15px; text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-        }
-        #turn-instruction { font-size: 28px; font-weight: 900; color: #fde047; margin-bottom: 4px; }
-        #next-station { font-size: 16px; color: #67e8f9; font-weight: bold; margin-bottom: 2px; }
-        #nav-status { font-size: 13px; color: #9ca3af; }
-
-        #control-panel {
-            position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); z-index: 1000;
-            background: rgba(255, 255, 255, 0.95); padding: 12px 24px; border-radius: 40px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 15px;
-        }
-        .btn {
-            background: #059669; color: white; border: none; padding: 12px 24px;
-            border-radius: 25px; font-size: 15px; font-weight: bold; cursor: pointer;
-        }
-        .btn:disabled { background: #94a3b8; cursor: not-allowed; }
-        #gps-debug { font-size: 13px; color: #1e293b; font-weight: 600; white-space: nowrap; }
+        #nav-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 1000; background: #111827; color: white; padding: 15px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+        #turn-instruction { font-size: 20px; font-weight: 900; color: #fde047; }
+        #next-station { font-size: 14px; color: #67e8f9; margin-top: 5px; }
+        #control-panel { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(255, 255, 255, 0.95); padding: 10px 20px; border-radius: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .btn { background: #059669; color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div id="nav-bar">
-        <div id="turn-instruction">안내 시작 버튼을 누르십시오</div>
-        <div id="next-station">안내 대기 중</div>
-        <div id="nav-status">대운교통 17번 노선 실시간 지리 숙지 시스템</div>
-    </div>
+<div id="nav-bar">
+    <div id="turn-instruction">안내 시작을 눌러주세요</div>
+    <div id="next-station">대운교통 17번 노선 시스템</div>
+</div>
 
-    <div id="map"></div>
+<div id="map"></div>
 
-    <div id="control-panel">
-        <button class="btn" id="start-btn" onclick="startNavigation()">내비게이션 안내 시작</button>
-        <div id="gps-debug">GPS 위성 신호 대기 중...</div>
-    </div>
+<div id="control-panel">
+    <button class="btn" id="start-btn" onclick="startNavigation()">내비게이션 안내 시작</button>
+</div>
 
-    <script>
-        // 기존 데이터를 안전하게 로드
-        var rawRouteData = [
-            {"spotSn":1,"routeName":"불모산종점","xCrdnt":128.72331574,"yCrdnt":35.19030864},
-            {"spotSn":4,"routeName":"한국전기연구원","xCrdnt":128.7195414,"yCrdnt":35.19196724},
-            // ... (기존 데이터 생략, 전체 데이터 포함 필수)
-            {"spotSn":179,"routeName":"북면종점","xCrdnt":128.6115508,"yCrdnt":35.35341769}
-        ];
+<script>
+    // 1. 전체 데이터
+    var rawRouteData = [
+        {"spotSn":1,"routeName":"불모산종점","xCrdnt":128.72331574,"yCrdnt":35.19030864},
+        {"spotSn":4,"routeName":"한국전기연구원","xCrdnt":128.7195414,"yCrdnt":35.19196724},
+        {"spotSn":9,"routeName":"삼정자내리마을","xCrdnt":128.7139308,"yCrdnt":35.19438498},
+        {"spotSn":12,"routeName":"창원경상대학병원","xCrdnt":128.7073607,"yCrdnt":35.19681068},
+        {"spotSn":15,"routeName":"성산구청","xCrdnt":128.7036404,"yCrdnt":35.19887318},
+        {"spotSn":18,"routeName":"남산공원환승센터","xCrdnt":128.69791119,"yCrdnt":35.20225501},
+        {"spotSn":20,"routeName":"남산동","xCrdnt":128.6957247,"yCrdnt":35.20348216},
+        {"spotSn":21,"routeName":"가음정사거리","xCrdnt":128.69260185,"yCrdnt":35.20526734},
+        {"spotSn":25,"routeName":"가음정본동","xCrdnt":128.6875982,"yCrdnt":35.20813443},
+        {"spotSn":28,"routeName":"창원남중","xCrdnt":128.6806342,"yCrdnt":35.21214043},
+        {"spotSn":29,"routeName":"재료연구원","xCrdnt":128.676145,"yCrdnt":35.21464504},
+        {"spotSn":34,"routeName":"창원병원","xCrdnt":128.6720982,"yCrdnt":35.21774543},
+        {"spotSn":37,"routeName":"중앙동행정복지센터","xCrdnt":128.67510472,"yCrdnt":35.2214263},
+        {"spotSn":40,"routeName":"중앙동","xCrdnt":128.6775482,"yCrdnt":35.22422143},
+        {"spotSn":43,"routeName":"창원시청(정우상가)","xCrdnt":128.67889909,"yCrdnt":35.22835367},
+        {"spotSn":46,"routeName":"창원중앙고등학교","xCrdnt":128.67616688,"yCrdnt":35.22995065},
+        {"spotSn":49,"routeName":"트리비앙아파트(한국폴리텍대학)","xCrdnt":128.6713433,"yCrdnt":35.23267371},
+        {"spotSn":51,"routeName":"노블파크아파트","xCrdnt":128.6669673,"yCrdnt":35.23487447},
+        {"spotSn":53,"routeName":"문성고등학교","xCrdnt":128.66189541,"yCrdnt":35.23743611},
+        {"spotSn":55,"routeName":"창원컨벤션센터","xCrdnt":128.65793884,"yCrdnt":35.23922073},
+        {"spotSn":56,"routeName":"시티7","xCrdnt":128.65370909,"yCrdnt":35.24095037},
+        {"spotSn":60,"routeName":"명서1민원센터","xCrdnt":128.64879258,"yCrdnt":35.24335839},
+        {"spotSn":64,"routeName":"명곡다리(명곡교회)","xCrdnt":128.64566429,"yCrdnt":35.24511555},
+        {"spotSn":68,"routeName":"명서시장","xCrdnt":128.64304684,"yCrdnt":35.24687922},
+        {"spotSn":70,"routeName":"명서초등학교","xCrdnt":128.6406418,"yCrdnt":35.2497845},
+        {"spotSn":73,"routeName":"서부경찰서(원흥사)","xCrdnt":128.63898748,"yCrdnt":35.25178736},
+        {"spotSn":76,"routeName":"의창구청","xCrdnt":128.63629632,"yCrdnt":35.25495778},
+        {"spotSn":79,"routeName":"의창스포츠센터","xCrdnt":128.63374428,"yCrdnt":35.25795279},
+        {"spotSn":85,"routeName":"소답동","xCrdnt":128.6257342,"yCrdnt":35.26146649},
+        {"spotSn":87,"routeName":"의창동환승센터","xCrdnt":128.6228942,"yCrdnt":35.26166344},
+        {"spotSn":89,"routeName":"윤병원","xCrdnt":128.6200302,"yCrdnt":35.26179249},
+        {"spotSn":92,"routeName":"동정동","xCrdnt":128.61832661,"yCrdnt":35.26336233},
+        {"spotSn":94,"routeName":"흥한웰가아파트","xCrdnt":128.6181899,"yCrdnt":35.26446465},
+        {"spotSn":96,"routeName":"동정동갓골","xCrdnt":128.6165887,"yCrdnt":35.26630467},
+        {"spotSn":103,"routeName":"천주암","xCrdnt":128.614358,"yCrdnt":35.27155964},
+        {"spotSn":104,"routeName":"굴현고개","xCrdnt":128.6160901,"yCrdnt":35.27730647},
+        {"spotSn":105,"routeName":"산수정","xCrdnt":128.6137152,"yCrdnt":35.28162744},
+        {"spotSn":106,"routeName":"달천산림욕장","xCrdnt":128.6128209,"yCrdnt":35.28342162},
+        {"spotSn":110,"routeName":"지개리입구","xCrdnt":128.61033015,"yCrdnt":35.28599286},
+        {"spotSn":112,"routeName":"외감입구","xCrdnt":128.606389,"yCrdnt":35.28938832},
+        {"spotSn":113,"routeName":"중재골입구","xCrdnt":128.60535783,"yCrdnt":35.29315158},
+        {"spotSn":115,"routeName":"새터교","xCrdnt":128.59621444,"yCrdnt":35.29619934},
+        {"spotSn":118,"routeName":"중방마을회관","xCrdnt":128.5932506,"yCrdnt":35.29657037},
+        {"spotSn":119,"routeName":"신진정밀","xCrdnt":128.58885472,"yCrdnt":35.29619263},
+        {"spotSn":121,"routeName":"포레힐스데시앙아파트","xCrdnt":128.58657954,"yCrdnt":35.2983201},
+        {"spotSn":122,"routeName":"감계중학교","xCrdnt":128.5865042,"yCrdnt":35.30050134},
+        {"spotSn":123,"routeName":"천수림아파트정문","xCrdnt":128.5864604,"yCrdnt":35.30168646},
+        {"spotSn":125,"routeName":"힐스테이트3차.천수림아파트","xCrdnt":128.5884201,"yCrdnt":35.30220878},
+        {"spotSn":126,"routeName":"덕산아내","xCrdnt":128.5920454,"yCrdnt":35.30220558},
+        {"spotSn":128,"routeName":"감계휴먼빌","xCrdnt":128.5938615,"yCrdnt":35.30221691},
+        {"spotSn":130,"routeName":"감계아내2차아파트","xCrdnt":128.5965079,"yCrdnt":35.30222893},
+        {"spotSn":133,"routeName":"감계입구","xCrdnt":128.6010192,"yCrdnt":35.30317206},
+        {"spotSn":135,"routeName":"감나무골","xCrdnt":128.6007584,"yCrdnt":35.30757175},
+        {"spotSn":137,"routeName":"대천","xCrdnt":128.6022593,"yCrdnt":35.30960711},
+        {"spotSn":138,"routeName":"까치골","xCrdnt":128.6056242,"yCrdnt":35.31211771},
+        {"spotSn":140,"routeName":"동전산단","xCrdnt":128.60513781,"yCrdnt":35.31568049},
+        {"spotSn":141,"routeName":"동전","xCrdnt":128.60378411,"yCrdnt":35.31770367},
+        {"spotSn":144,"routeName":"동전리","xCrdnt":128.59852752,"yCrdnt":35.31822615},
+        {"spotSn":147,"routeName":"무동입구","xCrdnt":128.5849012,"yCrdnt":35.31636963},
+        {"spotSn":148,"routeName":"STX칸2차아파트","xCrdnt":128.58043,"yCrdnt":35.31635846},
+        {"spotSn":150,"routeName":"무동센텀파라디아아파트","xCrdnt":128.5799316,"yCrdnt":35.31887438},
+        {"spotSn":153,"routeName":"휴먼빌1단지","xCrdnt":128.5838751,"yCrdnt":35.31947617},
+        {"spotSn":156,"routeName":"STX칸1차아파트후문","xCrdnt":128.58340703,"yCrdnt":35.32308446},
+        {"spotSn":158,"routeName":"신음","xCrdnt":128.5847338,"yCrdnt":35.32869158},
+        {"spotSn":159,"routeName":"북면양촌","xCrdnt":128.5894116,"yCrdnt":35.32889005},
+        {"spotSn":160,"routeName":"무곡리","xCrdnt":128.5943566,"yCrdnt":35.32981138},
+        {"spotSn":163,"routeName":"신동","xCrdnt":128.59891577,"yCrdnt":35.33090322},
+        {"spotSn":164,"routeName":"무곡리.갈곡마을","xCrdnt":128.5993785,"yCrdnt":35.33373489},
+        {"spotSn":165,"routeName":"영신아파트","xCrdnt":128.6002381,"yCrdnt":35.3364351},
+        {"spotSn":168,"routeName":"신촌주유소","xCrdnt":128.6011532,"yCrdnt":35.33977044},
+        {"spotSn":170,"routeName":"대호아파트","xCrdnt":128.605945,"yCrdnt":35.3448638},
+        {"spotSn":172,"routeName":"북면행정복지센터","xCrdnt":128.6077811,"yCrdnt":35.34781398},
+        {"spotSn":173,"routeName":"신한아파트","xCrdnt":128.6072349,"yCrdnt":35.34930898},
+        {"spotSn":174,"routeName":"북면온천마을회관","xCrdnt":128.60828528,"yCrdnt":35.35106543},
+        {"spotSn":175,"routeName":"북면농협","xCrdnt":128.6091275,"yCrdnt":35.35334524},
+        {"spotSn":179,"routeName":"북면종점","xCrdnt":128.6115508,"yCrdnt":35.35341769}
+    ];
 
-        // [문제 해결] Leaflet 지도가 로드된 후 데이터가 그려지도록 순서 보장
-        var map = L.map('map').setView([35.2279, 128.6817], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    // 2. 지도 및 노선 그리기
+    var map = L.map('map').setView([35.2279, 128.6817], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // 노선 및 정류장 그리기 함수
-        function drawRoute() {
-            rawRouteData.sort((a, b) => a.spotSn - b.spotSn);
-            var pathCoords = rawRouteData.map(item => [item.yCrdnt, item.xCrdnt]);
-            L.polyline(pathCoords, { color: '#ef4444', weight: 6, opacity: 0.85 }).addTo(map);
+    rawRouteData.sort((a, b) => a.spotSn - b.spotSn);
+    var pathCoords = rawRouteData.map(item => [item.yCrdnt, item.xCrdnt]);
+    L.polyline(pathCoords, { color: 'red', weight: 5 }).addTo(map);
 
-            rawRouteData.forEach(item => {
-                L.circleMarker([item.yCrdnt, item.xCrdnt], {
-                    radius: 5, color: '#1e3a8a', fillColor: '#fff', fillOpacity: 1, weight: 2.5
-                }).addTo(map).bindPopup(`<b>${item.routeName}</b>`);
-            });
+    rawRouteData.forEach(item => {
+        L.circleMarker([item.yCrdnt, item.xCrdnt], { radius: 4, color: 'blue' })
+         .addTo(map)
+         .bindPopup(item.routeName);
+    });
+
+    // 3. 내비게이션 기능
+    function startNavigation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(function(pos) {
+                var lat = pos.coords.latitude;
+                var lng = pos.coords.longitude;
+                map.setView([lat, lng], 16);
+            }, null, { enableHighAccuracy: true });
+            document.getElementById('turn-instruction').innerText = "안내를 시작합니다.";
         }
-
-        // 지도가 렌더링된 후 노선 그리기 실행
-        drawRoute();
-
-        // ... (이하 startNavigation 및 나머지 내비게이션 로직 동일)
-        function startNavigation() {
-            // ... (기존 코드 그대로 유지)
-        }
-        // ... (나머지 함수들도 동일)
-    </script>
+    }
+</script>
 </body>
 </html>
