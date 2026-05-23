@@ -29,7 +29,7 @@
 </div>
 
 <script>
-    // 1. 전체 데이터
+    // 1. 노선 데이터
     var rawRouteData = [
         {"spotSn":1,"routeName":"불모산종점","xCrdnt":128.72331574,"yCrdnt":35.19030864},
         {"spotSn":4,"routeName":"한국전기연구원","xCrdnt":128.7195414,"yCrdnt":35.19196724},
@@ -109,21 +109,23 @@
         {"spotSn":179,"routeName":"북면종점","xCrdnt":128.6115508,"yCrdnt":35.35341769}
     ];
 
-    // 2. 지도 및 노선 그리기
-    var map = L.map('map').setView([35.2279, 128.6817], 14);
+    // 2. 지도 초기화
+    var map = L.map('map').setView([35.2500, 128.6200], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+    // 3. 노선 경로 그리기
     rawRouteData.sort((a, b) => a.spotSn - b.spotSn);
     var pathCoords = rawRouteData.map(item => [item.yCrdnt, item.xCrdnt]);
-    L.polyline(pathCoords, { color: 'red', weight: 5 }).addTo(map);
+    L.polyline(pathCoords, { color: '#ef4444', weight: 6, opacity: 0.7 }).addTo(map);
 
+    // 4. 정류장 표시
     rawRouteData.forEach(item => {
-        L.circleMarker([item.yCrdnt, item.xCrdnt], { radius: 4, color: 'blue' })
+        L.circleMarker([item.yCrdnt, item.xCrdnt], { radius: 5, color: '#3b82f6', fillColor: '#fff', fillOpacity: 1 })
          .addTo(map)
-         .bindPopup(item.routeName);
+         .bindPopup("<b>" + item.routeName + "</b>");
     });
 
-    // 3. 내비게이션 기능
+    // 5. 내비게이션 기능
     function startNavigation() {
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(function(pos) {
@@ -131,7 +133,11 @@
                 var lng = pos.coords.longitude;
                 map.setView([lat, lng], 16);
             }, null, { enableHighAccuracy: true });
-            document.getElementById('turn-instruction').innerText = "안내를 시작합니다.";
+            document.getElementById('turn-instruction').innerText = "내비게이션 안내 중입니다.";
+            document.getElementById('start-btn').innerText = "안내 중...";
+            document.getElementById('start-btn').disabled = true;
+        } else {
+            alert("위치 정보를 지원하지 않는 브라우저입니다.");
         }
     }
 </script>
