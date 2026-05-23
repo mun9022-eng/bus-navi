@@ -7,7 +7,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; }
-        #map { width: 100%; height: 100%; }
+        #map { width: 100%; height: 100vh; }
         
         #nav-bar {
             position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
@@ -26,10 +26,8 @@
         .btn {
             background: #059669; color: white; border: none; padding: 12px 24px;
             border-radius: 25px; font-size: 15px; font-weight: bold; cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
-        .btn:disabled { background: #94a3b8; cursor: not-allowed; }
-        #gps-debug { font-size: 13px; color: #1e293b; font-weight: 600; white-space: nowrap; }
+        #gps-debug { font-size: 13px; color: #1e293b; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -44,109 +42,71 @@
 
     <div id="control-panel">
         <button class="btn" id="start-btn" onclick="startNavigation()">내비게이션 안내 시작</button>
-        <div id="gps-debug">GPS 위성 신호 대기 중...</div>
+        <div id="gps-debug">GPS 신호 대기 중</div>
     </div>
 
     <script>
-        // 데이터셋은 동일하게 유지
-        var rawRouteData = [ /* ... 기존 정류장 데이터 ... */ ];
-        var naviTurnPoints = [ /* ... 기존 회전 데이터 ... */ ];
+        // 1. 데이터 준비 (데이터가 없는 경우를 대비해 빈 배열로 초기화)
+        var rawRouteData = typeof rawRouteData !== 'undefined' ? rawRouteData : [];
+        var naviTurnPoints = typeof naviTurnPoints !== 'undefined' ? naviTurnPoints : [];
         
-        // 정렬 및 초기화
-        rawRouteData.sort((a, b) => a.spotSn - b.spotSn);
-        var pathCoords = rawRouteData.map(item => [item.yCrdnt, item.xCrdnt]);
-        var map = L.map('map').setView(pathCoords[0], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        L.polyline(pathCoords, { color: '#ef4444', weight: 6, opacity: 0.85 }).addTo(map);
+        // 2. 유효한 좌표만 추출 (에러 방지 핵심)
+        var validCoords = rawRouteData
+            .filter(item => item && item.yCrdnt && item.xCrdnt)
+            .map(item => [item.yCrdnt, item.xCrdnt]);
 
-        // 시뮬레이터 모드 전역 변수 추가
+        // 3. 지도 초기화 (좌표가 있을 때만 해당 위치로, 없으면 창원 기본 위치)
+        var map = L.map('map').setView(validCoords.length > 0 ? validCoords[0] : [35.2279, 128.6817], 14);
+        
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        if (validCoords.length > 0) {
+            L.polyline(validCoords, { color: '#ef4444', weight: 6 }).addTo(map);
+        }
+
+        // 시뮬레이터 관련 변수
         var isSimulationMode = false;
         var currentBusMarker = null;
         var targetStationIdx = 0;
         var targetTurnIdx = 0;
-        var lastSpokenStation = "";
-        var turnSpeechFlags = { spoken200: false, spoken50: false };
 
         function speak(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
-                var speech = new SpeechSynthesisUtterance(text);
-                speech.lang = 'ko-KR';
-                speech.rate = 1.05;
-                window.speechSynthesis.speak(speech);
+                var s = new SpeechSynthesisUtterance(text);
+                s.lang = 'ko-KR';
+                window.speechSynthesis.speak(s);
             }
         }
 
-        function getDistance(lat1, lon1, lat2, lon2) {
-            var R = 6371000;
-            var dLat = (lat2 - lat1) * Math.PI / 180;
-            var dLon = (lon2 - lon1) * Math.PI / 180;
-            var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        // [추가] 시뮬레이터 모드 실행 로직
         function startNavigation() {
-            if (confirm("실내 테스트(시뮬레이션 모드)를 시작하시겠습니까?\n취소를 누르면 실제 GPS를 사용합니다.")) {
-                isSimulationMode = true;
-                alert("시뮬레이션 모드 활성: 지도를 클릭하면 해당 위치로 차량이 이동합니다.");
-                document.getElementById('gps-debug').innerText = "시뮬레이션 모드: 지도 위를 클릭하세요.";
-            } else {
-                if (!navigator.geolocation) return alert("GPS를 사용할 수 없습니다.");
-                navigator.geolocation.watchPosition(processNavigationEngine, handleGPSError, { enableHighAccuracy: true });
-            }
+            isSimulationMode = confirm("실내 테스트(시뮬레이션 모드)를 하시겠습니까?");
             document.getElementById('start-btn').disabled = true;
-            document.getElementById('start-btn').innerText = "내비 안내 가동 중";
-            speak("대운교통 17번 노선 안내를 시작합니다.");
+            document.getElementById('start-btn').innerText = "내비 가동 중";
+            speak("안내를 시작합니다.");
+            
+            if (!isSimulationMode && navigator.geolocation) {
+                navigator.geolocation.watchPosition(updatePosition, () => {}, { enableHighAccuracy: true });
+            }
         }
 
-        // [추가] 지도 클릭 시 시뮬레이션 좌표 전달
         map.on('click', function(e) {
-            if (isSimulationMode) {
-                processNavigationEngine({ coords: { latitude: e.latlng.lat, longitude: e.latlng.lng, speed: 40 } });
-            }
+            if (isSimulationMode) updatePosition({ coords: { latitude: e.latlng.lat, longitude: e.latlng.lng } });
         });
 
-        // 내비 엔진 (기존 로직 통합)
-        function processNavigationEngine(position) {
-            var curLat = position.coords.latitude;
-            var curLng = position.coords.longitude;
-            var speed = position.coords.speed ? Math.round(position.coords.speed * 3.6) : 0;
-
-            document.getElementById('gps-debug').innerText = `좌표: ${curLat.toFixed(5)}, ${curLng.toFixed(5)} | ${isSimulationMode ? '[시뮬중]' : ''}`;
-
-            if (!currentBusMarker) {
-                currentBusMarker = L.circleMarker([curLat, curLng], { radius: 11, color: '#10b981', fillColor: '#10b981', weight: 3 }).addTo(map);
-            } else {
-                currentBusMarker.setLatLng([curLat, curLng]);
-            }
+        function updatePosition(pos) {
+            var lat = pos.coords.latitude;
+            var lng = pos.coords.longitude;
             
-            if(!isSimulationMode) map.setView([curLat, curLng], 16);
-
-            // Turn-by-Turn 로직
-            var activeTurn = naviTurnPoints[targetTurnIdx];
-            if (activeTurn) {
-                var distanceToTurn = getDistance(curLat, curLng, activeTurn.lat, activeTurn.lng);
-                document.getElementById('turn-instruction').innerText = `${activeTurn.actionText.split("앞")[1] || activeTurn.actionText} (${Math.round(distanceToTurn)}m)`;
-                if (distanceToTurn <= 220 && distanceToTurn >= 180 && !turnSpeechFlags.spoken200) { speak(activeTurn.spoken200); turnSpeechFlags.spoken200 = true; }
-                else if (distanceToTurn <= 65 && !turnSpeechFlags.spoken50) { speak(activeTurn.spoken50); turnSpeechFlags.spoken50 = true; }
-                else if (distanceToTurn < 25) { turnSpeechFlags = { spoken200: false, spoken50: false }; targetTurnIdx++; }
+            if (!currentBusMarker) {
+                currentBusMarker = L.circleMarker([lat, lng], { radius: 10, color: 'blue' }).addTo(map);
             }
-
-            // 정류장 로직
-            var nextStation = rawRouteData[targetStationIdx];
-            if (nextStation) {
-                var distanceToStation = getDistance(curLat, curLng, nextStation.yCrdnt, nextStation.xCrdnt);
-                document.getElementById('next-station').innerText = `다음 정류장: ${nextStation.routeName} (${Math.round(distanceToStation)}m)`;
-                if (distanceToStation <= 40 && lastSpokenStation !== nextStation.routeName) {
-                    lastSpokenStation = nextStation.routeName;
-                    speak(`이번 정류장은 ${nextStation.routeName}입니다.`);
-                    if (targetStationIdx < rawRouteData.length - 1) setTimeout(() => { targetStationIdx++; }, 5000);
-                }
-            }
+            currentBusMarker.setLatLng([lat, lng]);
+            if (!isSimulationMode) map.setView([lat, lng], 16);
+            document.getElementById('gps-debug').innerText = `현재 위치: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         }
-
-        function handleGPSError(err) { console.error(err); }
     </script>
 </body>
 </html>
