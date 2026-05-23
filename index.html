@@ -7,105 +7,78 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; }
-        #map { width: 100%; height: 100vh; }
+        #map { width: 100%; height: 100vh; display: block; }
         
         #nav-bar {
             position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
             background: #111827; color: white; padding: 15px; text-align: center;
             box-shadow: 0 4px 15px rgba(0,0,0,0.4);
         }
-        #turn-instruction { font-size: 28px; font-weight: 900; color: #fde047; margin-bottom: 4px; }
-        #next-station { font-size: 16px; color: #67e8f9; font-weight: bold; margin-bottom: 2px; }
-        #nav-status { font-size: 13px; color: #9ca3af; }
+        #turn-instruction { font-size: 24px; font-weight: 900; color: #fde047; }
+        #next-station { font-size: 14px; color: #67e8f9; margin-top: 5px; }
 
         #control-panel {
             position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); z-index: 1000;
-            background: rgba(255, 255, 255, 0.95); padding: 12px 24px; border-radius: 40px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 15px;
+            background: rgba(255, 255, 255, 0.95); padding: 10px 20px; border-radius: 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
-        .btn {
-            background: #059669; color: white; border: none; padding: 12px 24px;
-            border-radius: 25px; font-size: 15px; font-weight: bold; cursor: pointer;
-        }
-        #gps-debug { font-size: 13px; color: #1e293b; font-weight: 600; }
+        .btn { background: #059669; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="nav-bar">
-        <div id="turn-instruction">안내 시작 버튼을 누르십시오</div>
-        <div id="next-station">안내 대기 중</div>
-        <div id="nav-status">대운교통 17번 노선 실시간 지리 숙지 시스템</div>
+        <div id="turn-instruction">대운교통 17번 노선 안내</div>
+        <div id="next-station">안내 시작 버튼을 누르세요</div>
     </div>
 
     <div id="map"></div>
 
     <div id="control-panel">
-        <button class="btn" id="start-btn" onclick="startNavigation()">내비게이션 안내 시작</button>
-        <div id="gps-debug">GPS 신호 대기 중</div>
+        <button class="btn" id="start-btn" onclick="startNavigation()">내비게이션 시작</button>
+        <span id="gps-status" style="margin-left:10px; font-size:12px;">대기 중...</span>
     </div>
 
     <script>
-        // 1. 데이터 준비 (데이터가 없는 경우를 대비해 빈 배열로 초기화)
+        // 1. 데이터가 이미 정의되어 있는지 확인하고 없다면 빈 배열로 초기화
         var rawRouteData = typeof rawRouteData !== 'undefined' ? rawRouteData : [];
-        var naviTurnPoints = typeof naviTurnPoints !== 'undefined' ? naviTurnPoints : [];
         
-        // 2. 유효한 좌표만 추출 (에러 방지 핵심)
+        // 2. 좌표가 있는 데이터만 골라내어 에러 방지 (핵심 수정)
         var validCoords = rawRouteData
             .filter(item => item && item.yCrdnt && item.xCrdnt)
             .map(item => [item.yCrdnt, item.xCrdnt]);
 
-        // 3. 지도 초기화 (좌표가 있을 때만 해당 위치로, 없으면 창원 기본 위치)
+        // 3. 지도 초기화
         var map = L.map('map').setView(validCoords.length > 0 ? validCoords[0] : [35.2279, 128.6817], 14);
         
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+            attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
+        // 4. 노선 그리기
         if (validCoords.length > 0) {
             L.polyline(validCoords, { color: '#ef4444', weight: 6 }).addTo(map);
         }
 
-        // 시뮬레이터 관련 변수
-        var isSimulationMode = false;
-        var currentBusMarker = null;
-        var targetStationIdx = 0;
-        var targetTurnIdx = 0;
-
-        function speak(text) {
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                var s = new SpeechSynthesisUtterance(text);
-                s.lang = 'ko-KR';
-                window.speechSynthesis.speak(s);
-            }
-        }
+        var marker = null;
 
         function startNavigation() {
-            isSimulationMode = confirm("실내 테스트(시뮬레이션 모드)를 하시겠습니까?");
+            document.getElementById('start-btn').innerText = "운행 중";
             document.getElementById('start-btn').disabled = true;
-            document.getElementById('start-btn').innerText = "내비 가동 중";
-            speak("안내를 시작합니다.");
             
-            if (!isSimulationMode && navigator.geolocation) {
-                navigator.geolocation.watchPosition(updatePosition, () => {}, { enableHighAccuracy: true });
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(pos => {
+                    var lat = pos.coords.latitude;
+                    var lng = pos.coords.longitude;
+                    
+                    if (!marker) marker = L.circleMarker([lat, lng], {color: 'blue'}).addTo(map);
+                    marker.setLatLng([lat, lng]);
+                    map.setView([lat, lng], 16);
+                    document.getElementById('gps-status').innerText = `위치: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                }, err => {
+                    document.getElementById('gps-status').innerText = "GPS 신호 없음";
+                }, { enableHighAccuracy: true });
             }
-        }
-
-        map.on('click', function(e) {
-            if (isSimulationMode) updatePosition({ coords: { latitude: e.latlng.lat, longitude: e.latlng.lng } });
-        });
-
-        function updatePosition(pos) {
-            var lat = pos.coords.latitude;
-            var lng = pos.coords.longitude;
-            
-            if (!currentBusMarker) {
-                currentBusMarker = L.circleMarker([lat, lng], { radius: 10, color: 'blue' }).addTo(map);
-            }
-            currentBusMarker.setLatLng([lat, lng]);
-            if (!isSimulationMode) map.setView([lat, lng], 16);
-            document.getElementById('gps-debug').innerText = `현재 위치: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         }
     </script>
 </body>
