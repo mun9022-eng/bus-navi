@@ -57,9 +57,12 @@
 function openKakaoNavi() {
     var nextStation = rawRouteData[targetStationIdx];
     if (nextStation) {
-        // 필수 파라미터인 coordType을 wgs84로 명시
-        var url = `kakaonavi://navigate?name=${encodeURIComponent(nextStation.routeName)}&x=${nextStation.xCrdnt}&y=${nextStation.yCrdnt}&coordType=wgs84`;
+        // 카카오맵의 길찾기 기능을 활용하여 목적지 자동 설정
+        // x(경도), y(위도) 순서입니다.
+        var url = `kakaomap://route?ep=${nextStation.yCrdnt},${nextStation.xCrdnt}&by=CAR`;
         window.location.href = url;
+    } else {
+        alert("목적지가 설정되지 않았습니다.");
     }
 }
         // 기존 로직에 정류장 도착 시 자동 호출 기능 추가
